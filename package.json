@@ -1,0 +1,29 @@
+{
+  "name": "twitter-space-notif-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "type": "module",
+  "dependencies": {
+    "axios": "^0.26.1",
+    "dotenv": "^16.0.0",
+    "firebase-admin": "^10.1.0",
+    "log4js": "^6.4.5",
+    "node-cron": "^3.0.0",
+    "twitter-api-v2": "^1.12.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YutaNakamizo/twitter-space-notif-backend.git"
+  },
+  "author": "Yuta NAKAMIZO",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/YutaNakamizo/twitter-space-notif-backend/issues"
+  },
+  "homepage": "https://github.com/YutaNakamizo/twitter-space-notif-backend#readme"
+}
