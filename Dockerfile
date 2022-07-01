@@ -1,18 +1,18 @@
 FROM node:14.19.1-alpine3.15
 
-WORKDIR /usr/src/notif-app/
+WORKDIR /usr/src/twitter-space-notifier/
 
-COPY ./package*.json ./
+COPY ./app/package*.json ./
 RUN npm ci
 
-COPY ./src/ ./src/
+COPY ./app/src/ ./src/
 
 ENV TZ="Asia/Tokyo"
 
-ENV GOOGLE_APPLICATION_CREDENTIALS=""
-ENV NOTIF_TARGETS=""
+ENV GOOGLE_APPLICATION_CREDENTIALS="/etc/twitter-space-notifier/googleApplicationCredentials.json"
 
 ENV NOTIF_TWITTER_KEY=""
+ENV NOTIF_TARGETS=""
 ENV NOTIF_INTERVAL="* */5 * * * *"
 
 CMD [ "node", "src/index.js" ]

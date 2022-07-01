@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  notif:
+    build:
+      context: ./
+    configs:
+      - source: notif_google-application-credentials
+        target: /etc/twitter-space-notifier/googleApplicationCredentials.json
+    environment:
+      NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
+      NOTIF_TARGETS: ${NOTIF_TARGETS}
+      NOTIF_INTERVAL: ${NOTIF_INTERVAL}
+
+configs:
+  notif_google-application-credentials:
+    file: ${GOOGLE_APPLICATION_CREDENTIALS}
+
