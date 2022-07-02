@@ -1,12 +1,16 @@
-import cron from 'node-cron';
-import log4js from 'log4js';
-import * as twitter from './twitter.js';
-import {
-  firestore,
-} from './firebase.js';
-import { createClient as createRedisClient } from 'redis';
-import { main } from './notifier.js';
+// # Load env
+const {
+  NOTIF_TWITTER_KEY,
+  NOTIF_TARGETS,
+  NOTIF_TARGET_BY_USERNAME,
+  NOTIF_TARGET_BY_USERID,
+  NOTIF_INTERVAL,
+  REDIS_URL,
+} = process.env;
 
+// # Setup
+// ## Log4js
+const log4js = require('log4js');
 log4js.configure({
   appenders: {
     console: {
@@ -15,12 +19,12 @@ log4js.configure({
     system: {
       type: 'dateFile',
       filename: '/usr/data/notif/log/system.log',
-      pattern: '-yyyy-MM-dd',
+      pattern: 'yyyy-MM-dd',
     },
     error: {
       type: 'dateFile',
       filename: '/usr/data/notif/log/error.log',
-      pattern: '-yyyy-MM-dd',
+      pattern: 'yyyy-MM-dd',
     },
   },
   categories: {
@@ -31,16 +35,10 @@ log4js.configure({
       ],
       level: 'all',
     },
-    notif_default: {
+    error: {
       appenders: [
         'console',
         'system',
-      ],
-      level: 'all',
-    },
-    notif_error: {
-      appenders: [
-        'console',
         'error',
       ],
       level: 'warn',
@@ -48,24 +46,79 @@ log4js.configure({
   },
 });
 
-const logger = log4js.getLogger('notif_default');
-const errorLogger = log4js.getLogger('notif_error');
+const logger = log4js.getLogger('default');
+const errorLogger = log4js.getLogger('error');
 
+// ## Redis
+const { createClient: createRedisClient } = require('redis');
 const redisClient = createRedisClient({
-  url: process.env.REDIS_URL,
+  url: REDIS_URL,
 });
 
+// ## Firebase
+const { initializeApp: initializeFirebaseApp } = require('firebase-admin/app');
+const firebase = initializeFirebaseApp();
+
+// ### Cloud Firestore
+const { getFirestore } = require('firebase-admin/firestore');
+const firestore = getFirestore(firebase);
+
+// ## Twitter API
+const TwitterApi = require('twitter-api-v2');
+const twitter = new TwitterApi.TwitterApi(NOTIF_TWITTER_KEY);
+
+
+// # Launch cron
+const cron = require('node-cron');
+const {
+  main,
+} = require('./notifier.js');
+
 logger.info('Start cron.');
+
 cron.schedule(
-  process.env.NOTIF_INTERVAL || '* */5 * * * *',
+  NOTIF_INTERVAL || '* */5 * * * *',
   () => {
-    return main({
-      logger,
-      errorLogger,
-      firestore,
-      redisClient,
-      twitter,
-    });
+    try {
+      const usernameList = (NOTIF_TARGET_BY_USERNAME || NOTIF_TARGETS).replace(/ /g, '').split(',');
+      if(
+        usernameList.length === 1
+        && usernameList[0] === ''
+      ) usernameList.shift();
+
+      const userIdList = NOTIF_TARGET_BY_USERID.replace(/ /g, '').split(',');
+      if(
+        userIdList.length === 1
+        && userIdList[0] === ''
+      ) userIdList.shift();
+
+      return main({
+        usernameList,
+        userIdList,
+        logger,
+        errorLogger,
+        firestore,
+        redisClient,
+        twitter,
+      });
+    }
+    catch(err) {
+      errorLogger.fatal(`Main process crashed. ([${err.code} / ${err.name}] ${err.message})`);
+
+      return redisClient.hDel(
+        'twsn_core',
+        'pid'
+      ).catch(err => {
+        errorLogger.error(`Failed to remove pid. ([${err.code} / ${err.name}] ${err.message})`);
+        return;
+      }).finally(() => {
+        return redisClient.quit().catch(err => {
+          errorLogger.error(`Failed to quit redis connection. ([${err.code} / ${err.name}] ${err.message})`);
+        });
+      });
+    }
+
+    return;
   }
 );
 
