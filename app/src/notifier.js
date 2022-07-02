@@ -7,7 +7,11 @@ const main = ({
   logger,
   errorLogger,
   firestore,
+  FIRESTORE_ENDPOINT_COLLECTION,
+  FIRESTORE_SPACES_COLLECTION,
   redisClient,
+  redisCoreKey,
+  redisStateKey,
   twitter,
 }) => {
   logger.info('Start main process.');
@@ -60,7 +64,7 @@ const main = ({
 
     // Get previous Twitter Spaces
     const previousSpaces = await redisClient.hGet(
-      'twsn_state',
+      redisStateKey,
       username
     ).catch(err => {
       errorLogger.error(`Failed to get previous Twitter Spaces for @${username} (${userId}) ([${err.code} / ${err.name}] ${err.message})`);
@@ -94,7 +98,7 @@ const main = ({
 
     // Save latest Twitter Spaces
     await redisClient.hSet(
-      'twsn_state',
+      redisStateKey,
       username,
       JSON.stringify(currentSpaces)
     ).catch(err => {
@@ -113,7 +117,7 @@ const main = ({
           // Notify
           (
             // Get target endpoint
-            firestore.collection('endpoints').where('usernames', 'array-contains', username).get().catch(err => {
+            firestore.collection(FIRESTORE_ENDPOINT_COLLECTION).where('usernames', 'array-contains', username).get().catch(err => {
               errorLogger.error(`Failed to load endpoints from database. / ${err.code} ${err.name} ${err.message}`);
               rejectNotifAll(err);
               throw err;
@@ -196,7 +200,7 @@ const main = ({
           ),
           // Create Cloud Firestore document
           (
-            firestore.doc(`spaces/${id}`).set({
+            firestore.collection(FIRESTORE_SPACES_COLLECTION).doc(id).set({
               username,
               userId,
               startAt: FieldValue.serverTimestamp(),
@@ -219,7 +223,7 @@ const main = ({
         } = removed;
 
         // Update Cloud Firestore document
-        return firestore.doc(`spaces/${id}`).update({
+        return firestore.collection(FIRESTORE_SPACES_COLLECTION).doc(id).update({
           endAt: FieldValue.serverTimestamp(),
         }).then(() => {
           logger.debug(`Stored removed time of space "${id}", by @${username} (${userId}).`);
@@ -240,7 +244,10 @@ const main = ({
   
   // Check process
   return redisClient.connect().then(() => {
-    return redisClient.hGet('twsn_core', 'pid');
+    return redisClient.hGet(
+      redisCoreKey,
+      'pid'
+    );
   }).then(pid => {
     return !pid;
   }).then(isReady => {
@@ -251,7 +258,7 @@ const main = ({
 
     // Start process
     return redisClient.hSet(
-      'twsn_core',
+      redisCoreKey,
       'pid',
       String(process.pid)
     ).then(() => {
@@ -278,7 +285,7 @@ const main = ({
       });
     }).finally(() => {
       return redisClient.hDel(
-        'twsn_core',
+        redisCoreKey,
         'pid'
       ).catch(err => {
         errorLogger.error(`Failed to remove pid. ([${err.code} / ${err.name}] ${err.message})`);

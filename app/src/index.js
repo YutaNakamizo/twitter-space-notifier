@@ -1,11 +1,15 @@
 // # Load env
 const {
+  FIRESTORE_ENDPOINT_COLLECTION,
+  FIRESTORE_SPACES_COLLECTION,
   NOTIF_TWITTER_KEY,
   NOTIF_TARGETS,
   NOTIF_TARGET_BY_USERNAME,
   NOTIF_TARGET_BY_USERID,
   NOTIF_INTERVAL,
   REDIS_URL,
+  REDIS_KEY_PREFIX,
+  REDIS_KEY_SUFFIX,
 } = process.env;
 
 // # Setup
@@ -79,26 +83,39 @@ logger.info('Start cron.');
 cron.schedule(
   NOTIF_INTERVAL || '* */5 * * * *',
   () => {
+    const usernameList = (NOTIF_TARGET_BY_USERNAME || NOTIF_TARGETS).replace(/ /g, '').split(',');
+    if(
+      usernameList.length === 1
+      && usernameList[0] === ''
+    ) usernameList.shift();
+
+    const userIdList = NOTIF_TARGET_BY_USERID.replace(/ /g, '').split(',');
+    if(
+      userIdList.length === 1
+      && userIdList[0] === ''
+    ) userIdList.shift();
+
+    const createRedisKeyWithName = name => (
+      (REDIS_KEY_PREFIX.trim() !== '' ? `${REDIS_KEY_PREFIX.trim()}_` : '')
+      + name
+      + (REDIS_KEY_SUFFIX.trim() !== '' ? `_${REDIS_KEY_SUFFIX.trim()}` : '')
+    );
+    
+    const redisCoreKey = createRedisKeyWithName('core');
+    const redisStateKey = createRedisKeyWithName('state');
+
     try {
-      const usernameList = (NOTIF_TARGET_BY_USERNAME || NOTIF_TARGETS).replace(/ /g, '').split(',');
-      if(
-        usernameList.length === 1
-        && usernameList[0] === ''
-      ) usernameList.shift();
-
-      const userIdList = NOTIF_TARGET_BY_USERID.replace(/ /g, '').split(',');
-      if(
-        userIdList.length === 1
-        && userIdList[0] === ''
-      ) userIdList.shift();
-
       return main({
         usernameList,
         userIdList,
         logger,
         errorLogger,
         firestore,
+        FIRESTORE_ENDPOINT_COLLECTION,
+        FIRESTORE_SPACES_COLLECTION,
         redisClient,
+        redisCoreKey,
+        redisStateKey,
         twitter,
       });
     }
@@ -106,7 +123,7 @@ cron.schedule(
       errorLogger.fatal(`Main process crashed. ([${err.code} / ${err.name}] ${err.message})`);
 
       return redisClient.hDel(
-        'twsn_core',
+        redisCoreKey,
         'pid'
       ).catch(err => {
         errorLogger.error(`Failed to remove pid. ([${err.code} / ${err.name}] ${err.message})`);
