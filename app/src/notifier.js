@@ -1,6 +1,3 @@
-import path from 'path';
-import fs from 'fs/promises';
-import fsSync from 'fs';
 import axios from 'axios';
 import {
   FieldValue,
@@ -10,6 +7,7 @@ export const main = ({
   logger,
   errorLogger,
   firestore,
+  redisClient,
   twitter,
 }) => {
   logger.info('Start main process.');
@@ -17,16 +15,9 @@ export const main = ({
   const notify = ({
     usernameList = [],
   }) => {
-    return fs.readFile(
-      '/usr/data/notif/state.json',
-      'utf8'
-    ).catch(err => {
-      errorLogger.error(`Failed to read state.json. ([${err.code} / ${err.name}] ${err.message})`);
-      throw err;
-    }).then(_textPrevious => {
-      const previousSpacesAll = JSON.parse(_textPrevious);
-      const currentSpacesAll = previousSpacesAll;
-
+    return redisClient.hGetAll(
+      'twsn_state'
+    ).then(previousSpacesAll => {
       return Promise.allSettled(usernameList.map(username => {
         return new Promise(async (resolveHandleUser, rejectHandleUser) => {
           const currentSpaces = await twitter.getSpacesByUsername(username).catch(err => {
@@ -37,7 +28,7 @@ export const main = ({
           if(currentSpaces === null) return;
 
           logger.info(`Start processing @${username}`);
-          const previousSpaces = previousSpacesAll[username] || { data: [] };
+          const previousSpaces = previousSpacesAll[username] ? JSON.parse(previousSpacesAll[username]) : { data: [] };
           if(!currentSpaces.data) currentSpaces.data = [];
     
           // read previous state
@@ -59,7 +50,11 @@ export const main = ({
           }
     
           logger.info(`flags for @${username}: ${JSON.stringify(flags)}`);
-          currentSpacesAll[username] = currentSpaces;
+          await redisClient.hSet(
+            'twsn_state',
+            username,
+            JSON.stringify(currentSpaces)
+          );
           
           Promise.allSettled([
             Promise.allSettled(flags.created.map(created => {
@@ -193,64 +188,48 @@ export const main = ({
           ]).then(handleUserResult => {
             logger.info(`Completed processing @${username}.`);
             resolveHandleUser(username);
+          }).then(() => {
+            resolveHandleUser();
+          }).catch(err => {
+            rejectHandleUser();
           });
         });
-      })).then(resultHandleUserAll => {
-        // rewrite current state
-        return fs.writeFile(
-          '/usr/data/notif/state.json',
-          JSON.stringify(currentSpacesAll)
-        ).catch(err => {
-          errorLogger.error(`Failed to update state.json. / ${err.code} ${err.name} ${err.message}`);
-          throw err;
-        }).then(() => {
-          logger.info('Completed all target users.');
+      }));
+    });
+  };
+
+  return redisClient.connect().then(() => {
+    return redisClient.hGet('twsn_core', 'pid');
+  }).then(pid => {
+    if(pid) {
+      logger.info('Another main process is running.');
+      return;
+    }
+
+    return redisClient.hSet(
+      'twsn_core',
+      'pid',
+      String(process.pid)
+    ).then(() => {
+      const usernameList = process.env.NOTIF_TARGETS.replace(/ /g, '').split(',');
+      logger.info(`Target users: ${usernameList.join(', ')}`);
+      return notify({
+        usernameList,
+      }).finally(() => {
+        redisClient.hDel(
+          'twsn_core',
+          'pid'
+        ).then(() => {
+          logger.info('Completed main process.');
           return;
         });
       });
     });
-  };
-
-  return fs.readFile(
-    '/usr/data/notif/main.pid',
-    'utf8'
-  ).then(() => {
-    logger.info('Another main process is running.');
-  }).catch(err => {
-    return new Promise((resolve, reject) => {
-      if(err.code === 'ENOENT') {
-        fs.writeFile(
-          '/usr/data/notif/main.pid',
-          String(process.pid)
-        ).catch(err => {
-          errorLogger.error(`Failed to create main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-          reject(err);
-        }).then(() => {
-          const usernameList = process.env.NOTIF_TARGETS.replace(/ /g, '').split(',');
-          logger.info(`Target users: ${usernameList.join(', ')}`);
-          notify({
-            usernameList,
-          }).finally(() => {
-            fs.rm(
-              '/usr/data/notif/main.pid'
-            ).then(() => {
-              logger.info('Completed main process.');
-              resolve();
-            }).catch(err => {
-              errorLogger.error(`Failed to remove main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-              reject(err);
-            });
-          });
-        });
-      }
-      else {
-        errorLogger.error(`Failed to read main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-        reject(err);
-      }
-    });
   }).catch(err => {
     errorLogger.error(`Mainprocess crashed. ([${err.code} / ${err.name}] ${err.message})`);
     return;
+  }).finally(() => {
+    redisClient.quit();
   });
 };
 
