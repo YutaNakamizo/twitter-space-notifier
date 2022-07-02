@@ -7,6 +7,7 @@ import * as twitter from './twitter.js';
 import {
   firestore,
 } from './firebase.js';
+import { createClient as createRedisClient } from 'redis';
 import { main } from './notifier.js';
 
 log4js.configure({
@@ -53,38 +54,21 @@ log4js.configure({
 const logger = log4js.getLogger('notif_default');
 const errorLogger = log4js.getLogger('notif_error');
 
-logger.info('Checking state.json');
-fs.readFile(
-  '/usr/data/notif/state.json',
-  'utf8'
-).then(() => {
-  logger.info('state.json already exists.');
-}).catch(err => {
-  if(err.code === 'ENOENT') {
-    logger.info('creating state.json....');
-    fsSync.writeFileSync(
-      '/usr/data/notif/state.json',
-      '{}',
-      'utf8'
-    );
-    logger.info('created empty state.json');
-  }
-  else {
-    errorLogger.error(`${err.code} ${err.name} ${err.message}`);
-  }
-  return;
-}).finally(() => {
-  logger.info('Start cron.');
-  cron.schedule(
-    process.env.NOTIF_INTERVAL || '* */5 * * * *',
-    () => {
-      return main({
-        logger,
-        errorLogger,
-        firestore,
-        twitter,
-      });
-    }
-  );
+const redisClient = createRedisClient({
+  url: process.env.REDIS_URL,
 });
+
+logger.info('Start cron.');
+cron.schedule(
+  process.env.NOTIF_INTERVAL || '* */5 * * * *',
+  () => {
+    return main({
+      logger,
+      errorLogger,
+      firestore,
+      redisClient,
+      twitter,
+    });
+  }
+);
 

@@ -8,9 +8,15 @@ services:
       - source: notif_google-application-credentials
         target: /etc/twitter-space-notifier/googleApplicationCredentials.json
     environment:
+      TZ: Asia/Tokyo
       NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
       NOTIF_TARGETS: ${NOTIF_TARGETS}
       NOTIF_INTERVAL: ${NOTIF_INTERVAL}
+      REDIS_URL: redis://redis:6379/0
+  redis:
+    image: redis:7.0.2-alpine3.16
+    environment:
+      TZ: Asia/Tokyo
 
 configs:
   notif_google-application-credentials:

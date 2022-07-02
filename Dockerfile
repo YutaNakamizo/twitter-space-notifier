@@ -15,5 +15,7 @@ ENV NOTIF_TWITTER_KEY=""
 ENV NOTIF_TARGETS=""
 ENV NOTIF_INTERVAL="* */5 * * * *"
 
+ENV REDIS_URL=""
+
 CMD [ "node", "src/index.js" ]
 
