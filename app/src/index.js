@@ -22,12 +22,12 @@ log4js.configure({
     },
     system: {
       type: 'dateFile',
-      filename: '/usr/data/notif/log/system.log',
+      filename: '/var/log/twitter-spaces-notifier/system.log',
       pattern: 'yyyy-MM-dd',
     },
     error: {
       type: 'dateFile',
-      filename: '/usr/data/notif/log/error.log',
+      filename: '/var/log/twitter-spaces-notifier/error.log',
       pattern: 'yyyy-MM-dd',
     },
   },
