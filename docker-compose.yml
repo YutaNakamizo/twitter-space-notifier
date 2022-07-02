@@ -9,12 +9,16 @@ services:
         target: /etc/twitter-space-notifier/googleApplicationCredentials.json
     environment:
       TZ: Asia/Tokyo
+      FIRESTORE_ENDPOINT_COLLECTION: ${FIRESTORE_ENDPOINT_COLLECTION}
+      FIRESTORE_SPACES_COLLECTION: ${FIRESTORE_SPACES_COLLECTION}
       NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
       NOTIF_TARGETS: ${NOTIF_TARGETS}
       NOTIF_TARGET_BY_USERNAME: ${NOTIF_TARGET_BY_USERNAME}
       NOTIF_TARGET_BY_USERID: ${NOTIF_TARGET_BY_USERID}
       NOTIF_INTERVAL: ${NOTIF_INTERVAL}
       REDIS_URL: redis://redis:6379/0
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX}
+      REDIS_KEY_SUFFIX: ${REDIS_KEY_SUFFIX}
   redis:
     image: redis:7.0.2-alpine3.16
     environment:
