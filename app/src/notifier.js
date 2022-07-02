@@ -1,9 +1,7 @@
-import axios from 'axios';
-import {
-  FieldValue,
-} from 'firebase-admin/firestore';
+const axios = require('axios');
+const { FieldValue } = require('firebase-admin/firestore');
 
-export const main = ({
+const main = ({
   logger,
   errorLogger,
   firestore,
@@ -20,7 +18,9 @@ export const main = ({
     ).then(previousSpacesAll => {
       return Promise.allSettled(usernameList.map(username => {
         return new Promise(async (resolveHandleUser, rejectHandleUser) => {
-          const currentSpaces = await twitter.getSpacesByUsername(username).catch(err => {
+          const currentSpaces = await twitter.v2.userByUsername(username).then(user => {
+            return twitter.v2.spacesByCreators(user.data.id);
+          }).catch(err => {
             errorLogger.error(`Failed to get Twitter Space information ([${err.code} / ${err.name}] ${err.message})`);
             rejectHandleUser(err);
             return null;
@@ -233,4 +233,8 @@ export const main = ({
   });
 };
 
+
+module.exports = {
+  main,
+};
 
