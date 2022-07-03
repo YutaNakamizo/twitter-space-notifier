@@ -13,46 +13,6 @@ const {
 } = process.env;
 
 // # Setup
-// ## Log4js
-const log4js = require('log4js');
-log4js.configure({
-  appenders: {
-    console: {
-      type: 'console',
-    },
-    system: {
-      type: 'dateFile',
-      filename: '/var/log/twitter-spaces-notifier/system.log',
-      pattern: 'yyyy-MM-dd',
-    },
-    error: {
-      type: 'dateFile',
-      filename: '/var/log/twitter-spaces-notifier/error.log',
-      pattern: 'yyyy-MM-dd',
-    },
-  },
-  categories: {
-    default: {
-      appenders: [
-        'console',
-        'system',
-      ],
-      level: 'all',
-    },
-    error: {
-      appenders: [
-        'console',
-        'system',
-        'error',
-      ],
-      level: 'warn',
-    },
-  },
-});
-
-const logger = log4js.getLogger('default');
-const errorLogger = log4js.getLogger('error');
-
 // ## Redis
 const { createClient: createRedisClient } = require('redis');
 const redisClient = createRedisClient({
@@ -78,11 +38,48 @@ const {
   main,
 } = require('./notifier.js');
 
-logger.info('Start cron.');
-
 cron.schedule(
   NOTIF_INTERVAL || '* */5 * * * *',
   () => {
+    // Create logger
+    const log4js = require('log4js');
+    log4js.configure({
+      appenders: {
+        console: {
+          type: 'console',
+        },
+        system: {
+          type: 'dateFile',
+          filename: '/var/log/twitter-spaces-notifier/system.log',
+          pattern: 'yyyy-MM-dd',
+        },
+        error: {
+          type: 'dateFile',
+          filename: '/var/log/twitter-spaces-notifier/error.log',
+          pattern: 'yyyy-MM-dd',
+        },
+      },
+      categories: {
+        default: {
+          appenders: [
+            'console',
+            'system',
+          ],
+          level: 'all',
+        },
+        error: {
+          appenders: [
+            'console',
+            'system',
+            'error',
+          ],
+          level: 'warn',
+        },
+      },
+    });
+    const logger = log4js.getLogger('default');
+    const errorLogger = log4js.getLogger('error');
+
     const usernameList = (NOTIF_TARGET_BY_USERNAME || NOTIF_TARGETS).replace(/ /g, '').split(',');
     if(
       usernameList.length === 1
@@ -117,6 +114,8 @@ cron.schedule(
         redisCoreKey,
         redisStateKey,
         twitter,
+      }).finally(() => {
+        log4js.shutdown();
       });
     }
     catch(err) {
