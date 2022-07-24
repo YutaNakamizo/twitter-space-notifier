@@ -1,5 +1,10 @@
 FROM node:14.19.1-alpine3.15
 
+# Add Tini
+RUN apk add --no-cache tini
+ENTRYPOINT [ "/sbin/tini", "--" ]
+
+# Build app
 WORKDIR /usr/src/twitter-spaces-notifier/
 
 COPY ./app/package*.json ./
