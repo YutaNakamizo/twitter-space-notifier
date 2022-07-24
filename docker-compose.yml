@@ -8,6 +8,7 @@ services:
       - source: notif_google-application-credentials
         target: /etc/twitter-spaces-notifier/googleApplicationCredentials.json
     environment:
+      TZ: Asia/Tokyo
       NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
       NOTIF_TARGETS: ${NOTIF_TARGETS}
       NOTIF_INTERVAL: ${NOTIF_INTERVAL}
