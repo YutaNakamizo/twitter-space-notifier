@@ -14,6 +14,8 @@ ENV GOOGLE_APPLICATION_CREDENTIALS="/etc/twitter-spaces-notifier/googleApplicati
 ENV NOTIF_TWITTER_KEY=""
 ENV NOTIF_TARGETS=""
 ENV NOTIF_INTERVAL="* */5 * * * *"
+ENV FIRESTORE_ENDPOINT_COLLECTION="endpoints"
+ENV FIRESTORE_SPACES_COLLECTION="spaces"
 
 CMD [ "node", "src/index.js" ]
 

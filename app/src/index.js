@@ -2,6 +2,8 @@ const {
   NOTIF_TWITTER_KEY,
   NOTIF_TARGETS,
   NOTIF_INTERVAL,
+  FIRESTORE_ENDPOINT_COLLECTION = 'endpoints',
+  FIRESTORE_SPACES_COLLECTION = 'spaces',
   REDIS_URL,
   REDIS_KEY_PREFIX,
   REDIS_KEY_SUFFIX,
@@ -206,7 +208,7 @@ const notify = ({
               Promise.allSettled([
                 new Promise(async (resolveNotifAll, rejectNotifAll) => {
                   // notify
-                  const querySnap = await firestore.collection('endpoints').where('usernames', 'array-contains', username).get().catch(err => {
+                  const querySnap = await firestore.collection(FIRESTORE_ENDPOINT_COLLECTION).where('usernames', 'array-contains', username).get().catch(err => {
                     errorLogger.error(`Failed to load endpoints from database. ([${err.code} / ${err.name}] ${err.message})`);
                     rejectNotifAll(err);
                     return null;
@@ -290,7 +292,7 @@ const notify = ({
                 }),
                 new Promise((resolveStore, rejectStore) => {
                   // store start
-                  firestore.doc(`spaces/${id}`).set({
+                  firestore.doc(`${FIRESTORE_SPACES_COLLECTION}/${id}`).set({
                     username,
                     startAt: FieldValue.serverTimestamp(),
                   }).then(() => {
@@ -313,7 +315,7 @@ const notify = ({
               } = removed;
 
               // store
-              firestore.doc(`spaces/${id}`).update({
+              firestore.doc(`${FIRESTORE_SPACES_COLLECTION}/${id}`).update({
                 endAt: FieldValue.serverTimestamp(),
               }).then(() => {
                 logger.info(`Stored removed time of ${id}.`);
