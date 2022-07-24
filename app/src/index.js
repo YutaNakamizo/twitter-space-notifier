@@ -1,15 +1,24 @@
-import cron from 'node-cron';
-import path from 'path';
-import fs from 'fs/promises';
-import fsSync from 'fs';
-import axios from 'axios';
-import log4js from 'log4js';
-import * as twitter from './twitter.js';
-import {
+const {
+  NOTIF_TWITTER_KEY,
+  NOTIF_TARGETS,
+  NOTIF_INTERVAL,
+  REDIS_URL,
+  REDIS_KEY_PREFIX,
+  REDIS_KEY_SUFFIX,
+} = process.env;
+
+const path = require('path');
+const fs = require('fs/promises');
+const fsSync = require('fs');
+const axios = require('axios');
+const twitter = require('./twitter.js');
+const {
   firestore,
   FieldValue,
-} from './firebase.js';
+} = require('./firebase.js');
 
+// Log4js
+const log4js = require('log4js');
 log4js.configure({
   appenders: {
     console: {
@@ -54,48 +63,72 @@ log4js.configure({
 const logger = log4js.getLogger('notif_default');
 const errorLogger = log4js.getLogger('notif_error');
 
+// Redis
+const { createClient: createRedisClient } = require('redis');
+const redisClient = createRedisClient({
+  url: REDIS_URL,
+});
+
+const createRedisKeyWithName = name => (
+  (REDIS_KEY_PREFIX.trim() !== '' ? `${REDIS_KEY_PREFIX.trim()}_` : '')
+  + name
+  + (REDIS_KEY_SUFFIX.trim() !== '' ? `_${REDIS_KEY_SUFFIX.trim()}` : '')
+);
+const redisPidKey = createRedisKeyWithName('pid');
+const redisStateKey = createRedisKeyWithName('state');
+
+// Main Function
 const main = () => {
   logger.info('Start main process.');
 
-  return fs.readFile(
-    '/usr/data/notif/main.pid',
-    'utf8'
-  ).then(() => {
-    logger.info('Another main process is running.');
-  }).catch(err => {
-    return new Promise((resolve, reject) => {
-      if(err.code === 'ENOENT') {
-        fs.writeFile(
-          '/usr/data/notif/main.pid',
-          String(process.pid)
-        ).catch(err => {
-          errorLogger.error(`Failed to create main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-          reject(err);
-        }).then(() => {
-          const usernameList = process.env.NOTIF_TARGETS.replace(/ /g, '').split(',');
-          logger.info(`Target users: ${usernameList.join(', ')}`);
-          notify({
-            usernameList,
-          }).finally(() => {
-            fs.rm(
-              '/usr/data/notif/main.pid'
-            ).then(() => {
-              logger.info('Completed main process.');
-              resolve();
-            }).catch(err => {
-              errorLogger.error(`Failed to remove main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-              reject(err);
-            });
-          });
-        });
-      }
-      else {
-        errorLogger.error(`Failed to read main.pid. ([${err.code} / ${err.name}] ${err.message})`);
-        reject(err);
-      }
+  return redisClient.connect().catch(err => {
+    errorLogger.error(`Failed to connect to redis. ([${err.code} / ${err.name}] ${err.message})`);
+    throw err;
+  }).then(() => {
+    return redisClient.get(
+      redisPidKey
+    ).catch(err => {
+      errorLogger.error(`Failed to get existing pid. ([${err.code} / ${err.name}] ${err.message})`);
+      throw err;
+    }).then(pid => {
+      return !pid;
+    });
+  }).then(isReady => {
+    if(!isReady) {
+      logger.info('Another main process is running.');
+      return Promise.resolve();
+    }
+
+    return redisClient.set(
+      redisPidKey,
+      String(process.pid)
+    ).catch(err => {
+      errorLogger.error(`Failed to save pid. ([${err.code} / ${err.name}] ${err.message})`);
+      throw err;
+    }).then(() => {
+      const usernameList = NOTIF_TARGETS.replace(/ /g, '').split(',');
+      logger.info(`Target users: ${usernameList.join(', ')}`);
+      return notify({
+        usernameList,
+      });
+    }).finally(() => {
+      redisClient.del(
+        redisPidKey
+      ).catch(err => {
+        errorLogger.error(`Failed to delete pid. ([${err.code} / ${err.name}] ${err.message})`);
+        throw err;
+      });
+    });
+  }).finally(() => {
+    return redisClient.quit().catch(err => {
+      errorLogger.error(`Failed to disconnect redis. ([${err.code} / ${err.name}] ${err.message})`);
+      throw err;
     });
   }).catch(err => {
-    errorLogger.error(`Mainprocess crashed. ([${err.code} / ${err.name}] ${err.message})`);
+    errorLogger.error(`Main process crashed. ([${err.code} / ${err.name}] ${err.message})`);
+    return;
+  }).then(() => {
+    logger.info('Completed main process.');
     return;
   });
 };
@@ -298,31 +331,11 @@ const notify = ({
 };
 
 
-logger.info('Checking state.json');
-fs.readFile(
-  '/usr/data/notif/state.json',
-  'utf8'
-).then(() => {
-  logger.info('state.json already exists.');
-}).catch(err => {
-  if(err.code === 'ENOENT') {
-    logger.info('creating state.json....');
-    fsSync.writeFileSync(
-      '/usr/data/notif/state.json',
-      '{}',
-      'utf8'
-    );
-    logger.info('created empty state.json');
-  }
-  else {
-    errorLogger.error(`${err.code} ${err.name} ${err.message}`);
-  }
-  return;
-}).finally(() => {
-  logger.info('Start cron.');
-  cron.schedule(
-    process.env.NOTIF_INTERVAL || '* */5 * * * *',
-    main
-  );
-});
+// Launch
+const cron = require('node-cron');
+logger.info('Start cron.');
+cron.schedule(
+  NOTIF_INTERVAL || '* */5 * * * *',
+  main
+);
 

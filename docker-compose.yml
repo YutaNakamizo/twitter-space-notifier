@@ -12,6 +12,13 @@ services:
       NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
       NOTIF_TARGETS: ${NOTIF_TARGETS}
       NOTIF_INTERVAL: ${NOTIF_INTERVAL}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX}
+      REDIS_KEY_SUFFIX: ${REDIS_KEY_SUFFIX}
+  redis:
+    image: redis:7.0.2-alpine3.16
+    environment:
+      TZ: Asia/Tokyo
 
 configs:
   notif_google-application-credentials:

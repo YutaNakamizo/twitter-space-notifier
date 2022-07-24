@@ -1,9 +1,16 @@
-import { initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue as FirestoreFieldValue } from 'firebase-admin/firestore';
+const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore, FieldValue: FirestoreFieldValue } = require('firebase-admin/firestore');
 
-export const firebase = initializeApp();
-export const auth = getAuth(firebase);
-export const firestore = getFirestore(firebase);
-export const FieldValue = FirestoreFieldValue;
+const firebase = initializeApp();
+const auth = getAuth(firebase);
+const firestore = getFirestore(firebase);
+const FieldValue = FirestoreFieldValue;
+
+module.exports = {
+  firebase,
+  auth,
+  firestore,
+  FieldValue,
+};
 
