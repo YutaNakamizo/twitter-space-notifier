@@ -18,50 +18,62 @@ const {
 } = require('./firebase.js');
 
 // Log4js
-const log4js = require('log4js');
-log4js.configure({
-  appenders: {
-    console: {
-      type: 'console',
-    },
-    system: {
-      type: 'dateFile',
-      filename: '/usr/data/notif/log/system.log',
-      pattern: '-yyyy-MM-dd',
-    },
-    error: {
-      type: 'dateFile',
-      filename: '/usr/data/notif/log/error.log',
-      pattern: '-yyyy-MM-dd',
-    },
-  },
-  categories: {
-    default: {
-      appenders: [
-        'console',
-        'system',
-      ],
-      level: 'all',
-    },
-    notif_default: {
-      appenders: [
-        'console',
-        'system',
-      ],
-      level: 'all',
-    },
-    notif_error: {
-      appenders: [
-        'console',
-        'error',
-      ],
-      level: 'warn',
-    },
-  },
-});
+let logger = null;
+let errorLogger = null;
 
-const logger = log4js.getLogger('notif_default');
-const errorLogger = log4js.getLogger('notif_error');
+const log4js = require('log4js');
+const initLog4js = () => {
+  const loggerConfigs = {
+    appenders: {
+      console: {
+        type: 'console',
+      },
+      system: {
+        type: 'dateFile',
+        filename: '/usr/data/notif/log/system.log',
+        pattern: '-yyyy-MM-dd',
+      },
+      error: {
+        type: 'dateFile',
+        filename: '/usr/data/notif/log/error.log',
+        pattern: '-yyyy-MM-dd',
+      },
+    },
+    categories: {
+      default: {
+        appenders: [
+          'console',
+          'system',
+        ],
+        level: 'all',
+      },
+      notif_default: {
+        appenders: [
+          'console',
+          'system',
+        ],
+        level: 'all',
+      },
+      notif_error: {
+        appenders: [
+          'console',
+          'error',
+        ],
+        level: 'warn',
+      },
+    },
+  };
+  log4js.configure(loggerConfigs);
+  logger = log4js.getLogger('notif_default');
+  errorLogger = log4js.getLogger('notif_error');
+};
+const shutdownLog4js = (callback) => {
+  log4js.shutdown(() => {
+    logger = null;
+    errorLogger = null;
+    if(callback) callback();
+  });
+};
 
 // Redis
 const { createClient: createRedisClient } = require('redis');
@@ -79,6 +91,8 @@ const redisStateKey = createRedisKeyWithName('state');
 
 // Main Function
 const main = () => {
+  initLog4js();
+
   logger.info('Start main process.');
 
   return redisClient.connect().catch(err => {
@@ -130,6 +144,8 @@ const main = () => {
   }).then(() => {
     logger.info('Completed main process.');
     return;
+  }).finally(() => {
+    shutdownLog4js();
   });
 };
 
@@ -344,10 +360,12 @@ const notify = ({
 
 
 // Launch
+initLog4js();
 const cron = require('node-cron');
 logger.info('Start cron.');
 cron.schedule(
   NOTIF_INTERVAL || '* */5 * * * *',
   main
 );
+shutdownLog4js();
 
