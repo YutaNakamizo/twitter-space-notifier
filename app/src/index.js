@@ -91,10 +91,19 @@ const main = () => {
 
   logger.info('Start main process.');
 
-  return redisClient.connect().catch(err => {
-    errorLogger.error(`Failed to connect to redis. ([${err.code} / ${err.name}] ${err.message})`);
-    throw err;
-  }).then(() => {
+  return ((() => {
+    if(redisClient.isOpen) {
+      errorLogger.warn('redis client is already open.');
+      return Promise.resolve();
+    }
+    return redisClient.connect().catch(err => {
+      errorLogger.error(`Failed to connect to redis. ([${err.code} / ${err.name}] ${err.message})`);
+      throw err;
+    }).then(() => {
+      logger.debug('Connected to redis.');
+      return;
+    });
+  })()).then(() => {
     return redisClient.get(
       redisPidKey
     ).catch(err => {
@@ -130,9 +139,16 @@ const main = () => {
       });
     });
   }).finally(() => {
+    if(!redisClient.isOpen) {
+      errorLogger.warn('redis client is already closed.');
+      return;
+    }
+
     return redisClient.quit().catch(err => {
       errorLogger.error(`Failed to disconnect redis. ([${err.code} / ${err.name}] ${err.message})`);
       throw err;
+    }).then(() => {
+      logger.debug('Quit from redis.');
     });
   }).catch(err => {
     errorLogger.error(`Main process crashed. ([${err.code} / ${err.name}] ${err.message})`);
