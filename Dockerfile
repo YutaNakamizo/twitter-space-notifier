@@ -1,6 +1,6 @@
 FROM node:14.19.1-alpine3.15
 
-WORKDIR /usr/src/twitter-space-notifier/
+WORKDIR /usr/src/twitter-spaces-notifier/
 
 COPY ./app/package*.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ COPY ./app/src/ ./src/
 
 ENV TZ="Asia/Tokyo"
 
-ENV GOOGLE_APPLICATION_CREDENTIALS="/etc/twitter-space-notifier/googleApplicationCredentials.json"
+ENV GOOGLE_APPLICATION_CREDENTIALS="/etc/twitter-spaces-notifier/googleApplicationCredentials.json"
 
 ENV NOTIF_TWITTER_KEY=""
 ENV NOTIF_TARGETS=""

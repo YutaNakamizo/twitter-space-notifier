@@ -6,7 +6,7 @@ services:
       context: ./
     configs:
       - source: notif_google-application-credentials
-        target: /etc/twitter-space-notifier/googleApplicationCredentials.json
+        target: /etc/twitter-spaces-notifier/googleApplicationCredentials.json
     environment:
       NOTIF_TWITTER_KEY: ${NOTIF_TWITTER_KEY}
       NOTIF_TARGETS: ${NOTIF_TARGETS}
