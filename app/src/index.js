@@ -347,7 +347,7 @@ const notify = ({
           errorLogger.error(`Failed to update state for @${username}. / ${err.code} ${err.name} ${err.message}`);
           throw err;
         }).then(() => {
-          logger.info('Updated state for @${username}.');
+          logger.info(`Updated state for @${username}.`);
           return;
         });
       })).then(() => {
