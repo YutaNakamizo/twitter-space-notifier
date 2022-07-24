@@ -5,8 +5,8 @@ const {
   FIRESTORE_ENDPOINT_COLLECTION = 'endpoints',
   FIRESTORE_SPACES_COLLECTION = 'spaces',
   REDIS_URL,
-  REDIS_KEY_PREFIX,
-  REDIS_KEY_SUFFIX,
+  REDIS_KEY_PREFIX = 'twsn',
+  REDIS_KEY_SUFFIX = '',
 } = process.env;
 
 const path = require('path');
