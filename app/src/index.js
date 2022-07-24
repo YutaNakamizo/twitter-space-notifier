@@ -28,35 +28,29 @@ const initLog4js = () => {
       console: {
         type: 'console',
       },
-      system: {
+      debug: {
         type: 'dateFile',
-        filename: '/usr/data/notif/log/system.log',
-        pattern: '-yyyy-MM-dd',
+        filename: '/var/log/twitter-spaces-notifier/debug.log',
+        pattern: 'yyyy-MM-dd',
       },
       error: {
         type: 'dateFile',
-        filename: '/usr/data/notif/log/error.log',
-        pattern: '-yyyy-MM-dd',
+        filename: '/var/log/twitter-spaces-notifier/error.log',
+        pattern: 'yyyy-MM-dd',
       },
     },
     categories: {
       default: {
         appenders: [
           'console',
-          'system',
+          'debug',
         ],
         level: 'all',
       },
-      notif_default: {
+      error: {
         appenders: [
           'console',
-          'system',
-        ],
-        level: 'all',
-      },
-      notif_error: {
-        appenders: [
-          'console',
+          'debug',
           'error',
         ],
         level: 'warn',
@@ -64,8 +58,8 @@ const initLog4js = () => {
     },
   };
   log4js.configure(loggerConfigs);
-  logger = log4js.getLogger('notif_default');
-  errorLogger = log4js.getLogger('notif_error');
+  logger = log4js.getLogger('default');
+  errorLogger = log4js.getLogger('error');
 };
 const shutdownLog4js = (callback) => {
   log4js.shutdown(() => {
@@ -109,7 +103,7 @@ const main = () => {
     });
   }).then(isReady => {
     if(!isReady) {
-      logger.info('Another main process is running.');
+      logger.debug('Another main process is running.');
       return Promise.resolve();
     }
 
@@ -121,7 +115,7 @@ const main = () => {
       throw err;
     }).then(() => {
       const usernameList = NOTIF_TARGETS.replace(/ /g, '').split(',');
-      logger.info(`Target users: ${usernameList.join(', ')}`);
+      logger.debug(`Target users: ${usernameList.join(', ')}`);
       return notify({
         usernameList,
       });
@@ -176,7 +170,7 @@ const notify = ({
         });
         if(currentSpaces === null) return;
 
-        logger.info(`Start processing @${username}`);
+        logger.debug(`Start processing @${username}`);
         const previousSpaces = previousSpacesAll[username] || { data: [] };
         if(!currentSpaces.data) currentSpaces.data = [];
   
@@ -198,7 +192,7 @@ const notify = ({
           if(created) flags.created.push(curr);
         }
   
-        logger.info(`flags for @${username}: ${JSON.stringify(flags)}`);
+        logger.debug(`flags for @${username}: ${JSON.stringify(flags)}`);
         currentSpacesAll[username] = currentSpaces;
         
         Promise.allSettled([
@@ -213,7 +207,7 @@ const notify = ({
                 new Promise(async (resolveNotifAll, rejectNotifAll) => {
                   // notify
                   const querySnap = await firestore.collection('endpoints').where('usernames', 'array-contains', username).get().catch(err => {
-                    errorLogger.error(`Failed to load endpoints from database. / ${err.code} ${err.name} ${err.message}`);
+                    errorLogger.error(`Failed to load endpoints from database. ([${err.code} / ${err.name}] ${err.message})`);
                     rejectNotifAll(err);
                     return null;
                   });
@@ -227,7 +221,7 @@ const notify = ({
                         dest,
                         destDetails,
                       } = endpoint.data();
-                      logger.info(`dest: ${dest}, dest details: ${JSON.stringify(destDetails)}`);
+                      logger.debug(`dest: ${dest}, dest details: ${JSON.stringify(destDetails)}`);
 
                       const config = {
                         headers: {
@@ -277,10 +271,10 @@ const notify = ({
                       }
                       
                       axios(config).then(() => {
-                        logger.info(`Sent to ${config.url}. (id: ${endpoint.id})`);
+                        logger.info(`Sent to ${config.url} (id: ${endpoint.id}). [@${username}]`);
                         resolveNotif(endpoint.id);
                       }).catch(err => {
-                        errorLogger.error(`Failed to send to ${config.url}. (id: ${endpoint.id}). / ${err.code} ${err.name} ${err.message}`);
+                        errorLogger.error(`Failed to send to ${config.url} (id: ${endpoint.id}). [@${username}] ([${err.code} / ${err.name}] ${err.message})`);
                         rejectNotif(err);
                       });
                     });
@@ -303,7 +297,7 @@ const notify = ({
                     logger.info(`Stored space ${id}.`);
                     resolveStore(id);
                   }).catch(err => {
-                    errorLogger.error(`Failed to store space ${id} / ${err.code} ${err.name} ${err.message}`);
+                    errorLogger.error(`Failed to store space ${id}. ([${err.code} / ${err.name}] ${err.message})`);
                     rejectStore(err);
                   });
                 }),
@@ -325,13 +319,13 @@ const notify = ({
                 logger.info(`Stored removed time of ${id}.`);
                 resolveHandleRemoved(id);
               }).catch(err => {
-                errorLogger.error(`Failed to store removed time of ${id}. / ${err.code} ${err.name} ${err.message}`);
+                errorLogger.error(`Failed to store removed time of ${id}. ([${err.code} / ${err.name}] ${err.message})`);
                 rejectHandleRemoved(err);
               });
             });
           })),
         ]).then(handleUserResult => {
-          logger.info(`Completed processing @${username}.`);
+          logger.debug(`Completed processing @${username}.`);
           resolveHandleUser(username);
         });
       });
@@ -344,14 +338,14 @@ const notify = ({
           username,
           JSON.stringify(state)
         ).catch(err => {
-          errorLogger.error(`Failed to update state for @${username}. / ${err.code} ${err.name} ${err.message}`);
+          errorLogger.error(`Failed to update state for @${username}. ([${err.code} / ${err.name}] ${err.message})`);
           throw err;
         }).then(() => {
           logger.info(`Updated state for @${username}.`);
           return;
         });
       })).then(() => {
-        logger.info('Completed all target users.');
+        logger.debug('Completed all target users.');
         return;
       });
     });
