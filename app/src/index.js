@@ -136,15 +136,20 @@ const main = () => {
 const notify = ({
   usernameList = [],
 }) => {
-  return fs.readFile(
-    '/usr/data/notif/state.json',
-    'utf8'
+  return redisClient.hGetAll(
+    redisStateKey
   ).catch(err => {
-    errorLogger.error(`Failed to read state.json. ([${err.code} / ${err.name}] ${err.message})`);
+    errorLogger.error(`Failed to read previous state. ([${err.code} / ${err.name}] ${err.message})`);
     throw err;
-  }).then(_textPrevious => {
-    const previousSpacesAll = JSON.parse(_textPrevious);
-    const currentSpacesAll = previousSpacesAll;
+  }).then(_previousSpacesAll => {
+    const previousSpacesAll = {};
+    for(const key in _previousSpacesAll) {
+      previousSpacesAll[key] = JSON.parse(_previousSpacesAll[key]);
+    }
+    return previousSpacesAll;
+  }).then(previousSpacesAll => {
+    logger.debug(`Previous state: ${JSON.stringify(previousSpacesAll)}`);
+    const currentSpacesAll = { ...previousSpacesAll };
 
     return Promise.allSettled(usernameList.map(username => {
       return new Promise(async (resolveHandleUser, rejectHandleUser) => {
@@ -316,13 +321,20 @@ const notify = ({
       });
     })).then(resultHandleUserAll => {
       // rewrite current state
-      return fs.writeFile(
-        '/usr/data/notif/state.json',
-        JSON.stringify(currentSpacesAll)
-      ).catch(err => {
-        errorLogger.error(`Failed to update state.json. / ${err.code} ${err.name} ${err.message}`);
-        throw err;
-      }).then(() => {
+      return Promise.allSettled(Object.keys(currentSpacesAll).map(async (username) => {
+        const state = currentSpacesAll[username];
+        return redisClient.hSet(
+          redisStateKey,
+          username,
+          JSON.stringify(state)
+        ).catch(err => {
+          errorLogger.error(`Failed to update state for @${username}. / ${err.code} ${err.name} ${err.message}`);
+          throw err;
+        }).then(() => {
+          logger.info('Updated state for @${username}.');
+          return;
+        });
+      })).then(() => {
         logger.info('Completed all target users.');
         return;
       });
