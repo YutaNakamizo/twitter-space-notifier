@@ -19,6 +19,11 @@ const launchNotifier = () => {
     return;
   }
 
+  const {
+    logger,
+    errorLogger,
+  } = initLog4js();
+
   // Launch child process
   const childProcess = require("child_process");
   notifierProcess = childProcess.fork(
@@ -26,9 +31,6 @@ const launchNotifier = () => {
   );
 
   notifierProcess.on('error', () => {
-    const {
-      errorLogger,
-    } = initLog4js();
     errorLogger.error('Failed to launch child process.');
     shutdownLog4js();
 
@@ -37,19 +39,44 @@ const launchNotifier = () => {
   });
 
   notifierProcess.on('spawn', () => {
-    const {
-      logger,
-    } = initLog4js();
     logger.info('Launched child process.');
-    shutdownLog4js();
 
     return;
   });
 
-  notifierProcess.on('exit', () => {
+  notifierProcess.on('message', message => {
     const {
-      logger,
-    } = initLog4js();
+      type,
+      data,
+    } = message || {};
+
+    switch(type) {
+      default: {
+        return null;
+      }
+      case 'log': {
+        const {
+          level,
+          args = [],
+        } = data || {};
+        switch(level) {
+          default: {
+            logger.log(level, ...args);
+            break;
+          }
+          case 'fatal':
+          case 'error':
+          case 'warn': {
+            errorLogger.log(level, ...args);
+            break;
+          }
+        }
+        return;
+      }
+    }
+  });
+
+  notifierProcess.on('exit', () => {
     logger.info('Exited child process.');
     shutdownLog4js();
 
