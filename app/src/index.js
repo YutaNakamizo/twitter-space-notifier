@@ -35,44 +35,43 @@ const createRedisKeyWithName = name => (
   + name
   + (REDIS_KEY_SUFFIX.trim() !== '' ? `_${REDIS_KEY_SUFFIX.trim()}` : '')
 );
-const redisPidKey = createRedisKeyWithName('pid');
 const redisStateKey = createRedisKeyWithName('state');
+
+const openRedisClient = () => {
+  if(redisClient.isOpen) {
+    return Promise.resolve(redisClient);
+  }
+  return redisClient.connect().then(() => {
+    return redisClient;
+  }).catch(err => {
+    logger.error(`Failed to open redis connection. ([${err.code} / ${err.name}] ${err.message})`);
+    throw err;
+  });
+};
+
+const closeRedisClient = () => {
+  if(!redisClient.isOpen) {
+    return Promise.resolve();
+  }
+
+  return redisClient.quit().then(() => {
+    return;
+  }).catch(err => {
+    logger.error(`Failed to close redis connection. ([${err.code} / ${err.name}] ${err.message})`);
+    throw err;
+  });
+};
 
 // Main Function
 const main = () => {
-  return ((() => {
-    if(redisClient.isOpen) {
-      logger.warn('redis client is already open.');
-      return Promise.resolve();
-    }
-    return redisClient.connect().catch(err => {
-      logger.error(`Failed to connect to redis. ([${err.code} / ${err.name}] ${err.message})`);
-      throw err;
-    }).then(() => {
-      logger.debug('Connected to redis.');
-      return;
-    });
-  })()).then(() => {
+  return openRedisClient().then(() => {
     const usernameList = NOTIF_TARGETS.replace(/ /g, '').split(',');
     logger.debug(`Target users: ${usernameList.join(', ')}`);
     return notify({
       usernameList,
     });
   }).finally(() => {
-    if(!redisClient.isOpen) {
-      logger.warn('redis client is already closed.');
-      return;
-    }
-
-    return redisClient.quit().catch(err => {
-      logger.error(`Failed to disconnect redis. ([${err.code} / ${err.name}] ${err.message})`);
-      throw err;
-    }).then(() => {
-      logger.debug('Quit from redis.');
-    });
-  }).catch(err => {
-    logger.fatal(`Main process crashed. ([${err.code} / ${err.name}] ${err.message})`);
-    return;
+    return closeRedisClient();
   });
 };
 
