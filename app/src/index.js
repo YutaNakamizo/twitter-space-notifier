@@ -21,7 +21,6 @@ const launchNotifier = () => {
 
   const {
     logger,
-    errorLogger,
   } = initLog4js();
 
   // Launch child process
@@ -31,7 +30,7 @@ const launchNotifier = () => {
   );
 
   notifierProcess.on('error', () => {
-    errorLogger.error('Failed to launch child process.');
+    logger.error('Failed to launch child process.');
     shutdownLog4js();
 
     notifierProcess = null;
@@ -67,7 +66,7 @@ const launchNotifier = () => {
           case 'fatal':
           case 'error':
           case 'warn': {
-            errorLogger.log(level, ...args);
+            logger.log(level, ...args);
             break;
           }
         }
@@ -107,11 +106,10 @@ const createTask = () => {
 const startTask = () => {
   const {
     logger,
-    errorLogger,
   } = initLog4js();
 
   if(!task) {
-    errorLogger.warn('Cron task is not created.');
+    logger.warn('Cron task is not created.');
     shutdownLog4js();
 
     return;
@@ -127,11 +125,10 @@ const startTask = () => {
 const stopTask = () => {
   const {
     logger,
-    errorLogger,
   } = initLog4js();
   
   if(!task) {
-    errorLogger.warn('Cron task is not created.');
+    logger.warn('Cron task is not created.');
     shutdownLog4js();
 
     return;

@@ -1,52 +1,62 @@
 const log4js = require('log4js');
 
 const initLog4js = () => {
+  const isDebug = (process.env.NODE_ENV !== 'production');
+
   const loggerConfigs = {
     appenders: {
-      console: {
-        type: 'console',
+      stdout: {
+        type: 'stdout',
+        layout: {
+          type: 'pattern',
+          pattern: isDebug ? (
+            '%[[%d{ISO8601_WITH_TZ_OFFSET}] [%p]%] %m'
+          ) : (
+            '[%d{ISO8601_WITH_TZ_OFFSET}] [%p] %m'
+          ),
+        },
       },
-      debug: {
-        type: 'dateFile',
-        filename: '/var/log/twitter-spaces-notifier/debug.log',
-        pattern: 'yyyy-MM-dd',
+      stderr: {
+        type: 'stderr',
+        layout: {
+          type: 'pattern',
+          pattern: isDebug ? (
+            '%[[%d{ISO8601_WITH_TZ_OFFSET}] [%p]%] %m'
+          ) : (
+            '[%d{ISO8601_WITH_TZ_OFFSET}] [%p] %m'
+          ),
+        },
       },
-      error: {
-        type: 'dateFile',
-        filename: '/var/log/twitter-spaces-notifier/error.log',
-        pattern: 'yyyy-MM-dd',
+      filteredStdout: {
+        type: 'logLevelFilter',
+        appender: 'stdout',
+        level: isDebug ? 'trace' : 'info',
+        maxLevel: 'warn',
+      },
+      filteredStderr: {
+        type: 'logLevelFilter',
+        appender: 'stderr',
+        level: 'error',
       },
     },
     categories: {
       default: {
         appenders: [
-          'console',
-          'debug',
+          'filteredStdout',
+          'filteredStderr',
         ],
-        level: 'all',
-      },
-      error: {
-        appenders: [
-          'console',
-          'debug',
-          'error',
-        ],
-        level: 'warn',
+        level: 'trace',
       },
     },
   };
   log4js.configure(loggerConfigs);
   const logger = log4js.getLogger('default');
-  const errorLogger = log4js.getLogger('error');
   return {
     logger,
-    errorLogger,
   };
 };
 const shutdownLog4js = (callback) => {
   log4js.shutdown(() => {
-    logger = null;
-    errorLogger = null;
     if(callback) callback();
   });
 };
